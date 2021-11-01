@@ -15,6 +15,7 @@
  */
 package com.ait.lienzo.client.widget.panel.impl;
 
+import java.util.EnumSet;
 import java.util.List;
 import java.util.function.Predicate;
 
@@ -45,6 +46,7 @@ import com.ait.lienzo.client.core.shape.Shape;
 import com.ait.lienzo.client.core.shape.Viewport;
 import com.ait.lienzo.client.widget.DragContext;
 import com.ait.lienzo.client.widget.panel.LienzoPanel;
+import com.ait.lienzo.client.widget.panel.impl.LienzoPanelDragLimitEventDetail.LimitDirections;
 import com.ait.lienzo.gwtlienzo.event.shared.EventHandler;
 import com.ait.lienzo.shared.core.types.DragMode;
 import com.ait.lienzo.shared.core.types.EventPropagationMode;
@@ -53,6 +55,7 @@ import com.ait.lienzo.tools.client.event.EventType;
 import com.ait.lienzo.tools.client.event.HandlerRegistrationManager;
 import com.ait.lienzo.tools.client.event.INodeEvent;
 import com.ait.lienzo.tools.client.event.MouseEventUtil;
+import com.google.gwt.user.client.Timer;
 import elemental2.dom.AddEventListenerOptions;
 import elemental2.dom.Event;
 import elemental2.dom.EventListener;
@@ -65,6 +68,9 @@ import elemental2.dom.UIEvent;
 import jsinterop.base.Js;
 
 public final class LienzoPanelHandlerManager {
+
+    private static final double DRAG_BOUNDS_INCREMENT = 15;
+    private static final int DRAG_TIMER_INTERVAL = 50;
 
     private final LienzoPanel m_lienzo;
 
@@ -92,11 +98,23 @@ public final class LienzoPanelHandlerManager {
 
     private boolean m_mouse_button_right = false;
 
+    private IPrimitive<?> m_over_prim = null;
+
     private DragMode m_drag_mode = null;
+
+    private int m_last_drag_move_x;
+
+    private int m_last_drag_move_y;
+
+    private MouseEvent m_last_drag_mouse_event;
+
+    private TouchEvent m_last_drag_touch_event;
 
     private IPrimitive<?> m_drag_node = null;
 
-    private IPrimitive<?> m_over_prim = null;
+    private Timer m_drag_limits_timer;
+
+    private EnumSet<LimitDirections> m_drag_limits_direction;
 
     private DragContext m_dragContext;
 
@@ -111,6 +129,7 @@ public final class LienzoPanelHandlerManager {
         m_mediators = m_viewport.getMediators();
 
         handlerRegistrationManager = new HandlerRegistrationManager();
+        initializeDragBoundsTimer();
         addHandlers();
     }
 
@@ -444,6 +463,21 @@ public final class LienzoPanelHandlerManager {
             event.preventDefault();
         });
 
+        LienzoPanelEvents.addDragLimitsOverEventListener(m_lienzo, (Event event) -> {
+            LienzoPanelDragLimitEventDetail detail = LienzoPanelDragLimitEventDetail.getDragLimitDetail(event);
+            m_drag_limits_direction = detail.getLimitDirection();
+            if (!m_drag_limits_timer.isRunning()) {
+                m_drag_limits_timer.scheduleRepeating(DRAG_TIMER_INTERVAL);
+            }
+        });
+
+        LienzoPanelEvents.addDragLimitsOutEventListener(m_lienzo, (Event event) -> {
+            m_drag_limits_direction.clear();
+            if (m_drag_limits_timer.isRunning()) {
+                m_drag_limits_timer.cancel();
+            }
+        });
+
         // TODO: @FIXME Elemental2 does not provide Gesture support, so disabling this for now (mdp)
 //        handlerRegistrationManager.register (
 //            m_lienzo.addGestureStartHandler(new GestureStartHandler()
@@ -522,9 +556,40 @@ public final class LienzoPanelHandlerManager {
         return m_viewport.findShapeAtPoint(x, y);
     }
 
+    private final void initializeDragBoundsTimer() {
+        m_drag_limits_timer = new Timer() {
+            @Override
+            public void run() {
+                double offsetX = 0;
+
+                double offsetY = 0;
+
+                if (m_drag_limits_direction.contains(LimitDirections.LEFT)) {
+                    offsetX = -DRAG_BOUNDS_INCREMENT;
+                }
+                if (m_drag_limits_direction.contains(LimitDirections.RIGHT)) {
+                    offsetX = DRAG_BOUNDS_INCREMENT;
+                }
+                if (m_drag_limits_direction.contains(LimitDirections.TOP)) {
+                    offsetY = -DRAG_BOUNDS_INCREMENT;
+                }
+                if (m_drag_limits_direction.contains(LimitDirections.DOWN)) {
+                    offsetY = DRAG_BOUNDS_INCREMENT;
+                }
+
+                doDragOffset(offsetX, offsetY);
+            }
+        };
+    }
+
     private final void doDragCancel(int x, int y, final MouseEvent mouseEvent, final TouchEvent touchEvent) {
         if (m_dragging) {
             doDragMove(x, y, mouseEvent, touchEvent);
+
+            if (m_drag_limits_timer.isRunning()) {
+                m_drag_limits_direction.clear();
+                m_drag_limits_timer.cancel();
+            }
 
             // TODO: Cursor stuff   .
             /*Cursor cursor = m_lienzo.getNormalCursor();
@@ -546,6 +611,8 @@ public final class LienzoPanelHandlerManager {
             m_lienzo.setCursor(cursor);*/
 
             fireEvent(mouseEvent, touchEvent, x, y, m_dragContext, m_drag_node.asNode(), nodeDragEndEvent);
+
+            LienzoPanelEvents.firePrimitiveDragEndEvent(m_lienzo, m_drag_node, x, y);
 
             m_dragContext.dragDone();
 
@@ -598,6 +665,8 @@ public final class LienzoPanelHandlerManager {
 
         m_drag_node.setDragging(true);
 
+        LienzoPanelEvents.firePrimitiveDragStartEvent(m_lienzo, m_drag_node, x, y);
+
         fireEvent(mouseEvent, touchEvent, x, y, m_dragContext, node, nodeDragStartEvent);
 
         m_dragging = true;
@@ -614,12 +683,54 @@ public final class LienzoPanelHandlerManager {
         m_dragging_using_touches = touchEvent != null;
     }
 
-    private final void doDragMove(int x, int y, final MouseEvent mouseEvent, final TouchEvent touchEvent) {
-        m_dragContext.dragUpdate(x, y);
+    private final void doDragMove(final int x, final int y, final MouseEvent mouseEvent, final TouchEvent touchEvent) {
+        m_last_drag_move_x = x;
+
+        m_last_drag_move_y = y;
+
+        m_last_drag_mouse_event = mouseEvent;
+
+        m_last_drag_touch_event = touchEvent;
+
+        m_dragContext.dragMoveUpdate(x, y);
+
+        if (m_drag_limits_direction != null) {
+            m_drag_limits_direction.clear();
+        }
+        if (m_drag_limits_timer.isRunning()) {
+            m_drag_limits_timer.cancel();
+        }
+
+        LienzoPanelEvents.firePrimitiveDragMoveUpdateEvent(m_lienzo, m_drag_node, x, y);
 
         if (m_dragging_dispatch_move) {
             fireEvent(mouseEvent, touchEvent, x, y, m_dragContext, m_drag_node.asNode(), nodeDragMoveEvent);
         }
+
+        if (DragMode.DRAG_LAYER == m_drag_mode) {
+            m_viewport.getDragLayer().draw();
+
+            m_dragContext.drawNodeWithTransforms(m_viewport.getDragLayer().getContext());
+        } else {
+            m_drag_node.getLayer().batch();
+        }
+    }
+
+    private final void doDragOffset(final double offsetX, final double offsetY) {
+        m_dragContext.dragOffsetUpdate(offsetX, offsetY);
+
+        LienzoPanelEvents.firePrimitiveDragOffsetUpdateEvent(m_lienzo, m_drag_node, offsetX, offsetY);
+
+        if (m_dragging_dispatch_move) {
+            fireEvent(m_last_drag_mouse_event,
+                      m_last_drag_touch_event,
+                      m_last_drag_move_x,
+                      m_last_drag_move_y,
+                      m_dragContext,
+                      m_drag_node.asNode(),
+                      nodeDragMoveEvent);
+        }
+
         if (DragMode.DRAG_LAYER == m_drag_mode) {
             m_viewport.getDragLayer().draw();
 
