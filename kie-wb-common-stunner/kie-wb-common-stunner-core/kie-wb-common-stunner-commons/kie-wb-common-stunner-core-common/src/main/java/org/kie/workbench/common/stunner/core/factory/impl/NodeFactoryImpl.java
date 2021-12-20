@@ -67,6 +67,21 @@ public class NodeFactoryImpl extends AbstractElementFactory<Object, Definition<O
         return node;
     }
 
+    @SuppressWarnings("unchecked")
+    public Node<Definition<Object>, Edge> build(final String uuid,
+                                                final Object definition, double x, double y) {
+        final NodeImpl node = new NodeImpl<>(uuid);
+        final Bounds bounds = definitionUtils.buildBounds(definition,
+                                                          x,
+                                                          y);
+        View<Object> content = new ViewImpl<>(definition,
+                                              bounds);
+        node.setContent(content);
+        appendLabels(node.getLabels(),
+                     definition);
+        return node;
+    }
+
     @Override
     public boolean accepts(final Object source) {
         return true;

@@ -17,11 +17,13 @@
 package org.kie.workbench.common.stunner.bpmn.client.marshall.service;
 
 import java.util.Collection;
+import java.util.Iterator;
 import java.util.Objects;
 
 import javax.enterprise.context.ApplicationScoped;
 import javax.inject.Inject;
 
+import elemental2.dom.DomGlobal;
 import elemental2.promise.Promise;
 import org.kie.workbench.common.stunner.bpmn.client.workitem.WorkItemDefinitionClientService;
 import org.kie.workbench.common.stunner.bpmn.definition.BPMNDiagram;
@@ -29,11 +31,13 @@ import org.kie.workbench.common.stunner.bpmn.definition.BPMNViewDefinition;
 import org.kie.workbench.common.stunner.bpmn.definition.models.bpmn2.Definitions;
 import org.kie.workbench.common.stunner.bpmn.definition.models.bpmn2.Process;
 import org.kie.workbench.common.stunner.bpmn.definition.models.bpmn2.StartEvent;
+import org.kie.workbench.common.stunner.bpmn.definition.models.bpmn2.StartNoneEvent;
 import org.kie.workbench.common.stunner.bpmn.definition.models.bpmndi.BpmnShape;
 import org.kie.workbench.common.stunner.bpmn.factory.BPMNDiagramFactory;
 import org.kie.workbench.common.stunner.bpmn.workitem.WorkItemDefinition;
 import org.kie.workbench.common.stunner.core.api.DefinitionManager;
 import org.kie.workbench.common.stunner.core.api.FactoryManager;
+import org.kie.workbench.common.stunner.core.client.api.ClientFactoryManager;
 import org.kie.workbench.common.stunner.core.client.api.ShapeManager;
 import org.kie.workbench.common.stunner.core.client.service.ClientRuntimeError;
 import org.kie.workbench.common.stunner.core.client.service.ServiceCallback;
@@ -42,6 +46,9 @@ import org.kie.workbench.common.stunner.core.diagram.DiagramImpl;
 import org.kie.workbench.common.stunner.core.diagram.DiagramParsingException;
 import org.kie.workbench.common.stunner.core.diagram.Metadata;
 import org.kie.workbench.common.stunner.core.diagram.MetadataImpl;
+import org.kie.workbench.common.stunner.core.factory.impl.NodeFactoryImpl;
+import org.kie.workbench.common.stunner.core.graph.Edge;
+import org.kie.workbench.common.stunner.core.graph.Element;
 import org.kie.workbench.common.stunner.core.graph.Graph;
 import org.kie.workbench.common.stunner.core.graph.Node;
 import org.kie.workbench.common.stunner.core.graph.content.definition.Definition;
@@ -66,10 +73,11 @@ public class BPMNClientDiagramService extends AbstractKogitoClientDiagramService
     private final ShapeManager shapeManager;
     private final Promises promises;
     private final WorkItemDefinitionClientService widService;
+    private final NodeFactoryImpl nodeFactory;
 
     //CDI proxy
     protected BPMNClientDiagramService() {
-        this(null, null, null, null, null, null, null);
+        this(null, null, null, null, null, null, null, null);
     }
 
     @Inject
@@ -79,7 +87,8 @@ public class BPMNClientDiagramService extends AbstractKogitoClientDiagramService
                                     final BPMNDiagramFactory diagramFactory,
                                     final ShapeManager shapeManager,
                                     final Promises promises,
-                                    final WorkItemDefinitionClientService widService) {
+                                    final WorkItemDefinitionClientService widService,
+                                    final NodeFactoryImpl nodeFactory) {
         this.definitionManager = definitionManager;
         this.marshalling = marshalling;
         this.factoryManager = factoryManager;
@@ -87,6 +96,7 @@ public class BPMNClientDiagramService extends AbstractKogitoClientDiagramService
         this.shapeManager = shapeManager;
         this.promises = promises;
         this.widService = widService;
+        this.nodeFactory = nodeFactory;
     }
 
     @Override
@@ -129,7 +139,35 @@ public class BPMNClientDiagramService extends AbstractKogitoClientDiagramService
     }
 
     public Promise<String> transform(final Diagram diagram) {
+        Iterable<NodeImpl<ViewImpl<BPMNViewDefinition>>> nodes = diagram.getGraph().nodes();
+
+        DomGlobal.console.debug("Nodes....");
+
+        for (final NodeImpl<ViewImpl<BPMNViewDefinition>> node : nodes) {
+            BPMNViewDefinition n = node.getContent().getDefinition();
+            if (n instanceof StartEvent) {
+                final StartEvent n1 = (StartEvent) n;
+                DomGlobal.console.debug("Start Event id::" + n1.getId());
+                DomGlobal.console.debug("Start Event Categoru::" + n1.getCategory());
+                DomGlobal.console.debug("Start Event Name::" + n1.getName());
+                DomGlobal.console.debug("Start Event Documentation::" + n1.getDocumentation());
+                DomGlobal.console.debug("Start Event Element Parameters::" + n1.getElementParameters());
+                DomGlobal.console.debug("Start Event Labels::" + n1.getLabels());
+                DomGlobal.console.debug("Start Event Outgoing::" + n1.getOutgoing());
+                DomGlobal.console.debug("Start Event hasInputVars::" + n1.hasInputVars());
+                DomGlobal.console.debug("Start Event hasOutputvars::" + n1.hasOutputVars());
+                DomGlobal.console.debug("Start Event isSingleInputVar::" + n1.isSingleInputVar());
+                DomGlobal.console.debug("Start Event isSingleOutputVar::" + n1.isSingleOutputVar());
+                DomGlobal.console.debug("Start Event getAdvancedData::" + n1.getAdvancedData());
+                DomGlobal.console.debug("Start Event getExtensionElements::" + n1.getExtensionElements());
+
+
+
+
+            }
+        }
         String raw = marshalling.marshall(convert(diagram));
+        DomGlobal.console.debug("BPMNClientDiagramService:::transform raw: " + raw);
         return promises.resolve(raw);
     }
 
@@ -184,18 +222,46 @@ public class BPMNClientDiagramService extends AbstractKogitoClientDiagramService
 
         diagramNode.getContent().setDefinition(definitions.getProcess());
 
-
+        DomGlobal.console.debug("BPMNClientDiagramService:::parse returning...");
+        if (true) {
+        //    return diagram;
+        }
         for (StartEvent event : definitions.getProcess().getStartEvents()) {
             for (BpmnShape shape : definitions.getBpmnDiagram().getBpmnPlane().getBpmnShapes()) {
                 if (shape.getBpmnElement().equals(event.getId())) {
-                    NodeImpl<ViewImpl<BPMNViewDefinition>> node = new NodeImpl<>(event.getId());
-                    node.getContent().setDefinition(event);
-                    diagram.getGraph().addNode((Node) event);
+
+                    DomGlobal.console.debug("BPMNClientDiagramService:::parse adding Node 1...");
+                    final Node<Definition<Object>, Edge> build = nodeFactory.build(event.getId(), event, shape.getBounds().getX(), shape.getBounds().getY());
+                    //EdgeFactoryImpl
+                    DomGlobal.console.debug("BPMNClientDiagramService:::parse adding Node 2...");
+                    //final ViewImpl<BPMNViewDefinition> content = node.getContent();
+                    DomGlobal.console.debug("BPMNClientDiagramService:::parse adding Node 3...");
+                    DomGlobal.console.debug("Start Event id::" + event.getId());
+                    DomGlobal.console.debug("Start Event Categoru::" + event.getCategory());
+                    DomGlobal.console.debug("Start Event Name::" + event.getName());
+                    DomGlobal.console.debug("Start Event Documentation::" + event.getDocumentation());
+                    DomGlobal.console.debug("Start Event Element Parameters::" + event.getElementParameters());
+                    DomGlobal.console.debug("Start Event Labels::" + event.getLabels());
+                    DomGlobal.console.debug("Start Event Outgoing::" + event.getOutgoing());
+                    DomGlobal.console.debug("Start Event hasInputVars::" + event.hasInputVars());
+                    DomGlobal.console.debug("Start Event hasOutputvars::" + event.hasOutputVars());
+                    DomGlobal.console.debug("Start Event isSingleInputVar::" + event.isSingleInputVar());
+                    DomGlobal.console.debug("Start Event isSingleOutputVar::" + event.isSingleOutputVar());
+                    DomGlobal.console.debug("Start Event getAdvancedData::" + event.getAdvancedData());
+                    DomGlobal.console.debug("Start Event getExtensionElements::" + event.getExtensionElements());
+                    DomGlobal.console.debug("Start Event Content::" + build.getContent());
+                    DomGlobal.console.debug("BPMNClientDiagramService:::parse adding Node 4...");
+
+                    diagram.getGraph().addNode(build);
+
                 }
             }
         }
+        DomGlobal.console.debug("BPMNClientDiagramService:::parse update Diagram...");
 
         updateDiagramSet(diagramNode, fileName);
+        DomGlobal.console.debug("BPMNClientDiagramService:::parse update Metadata...");
+
         updateClientMetadata(diagram);
 
         return diagram;

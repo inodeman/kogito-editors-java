@@ -27,6 +27,7 @@ import javax.inject.Inject;
 import com.ait.lienzo.client.core.types.JsCanvas;
 import com.ait.lienzo.client.widget.panel.LienzoBoundsPanel;
 import com.google.gwt.user.client.ui.IsWidget;
+import elemental2.dom.DomGlobal;
 import elemental2.promise.Promise;
 import org.kie.workbench.common.stunner.client.lienzo.canvas.LienzoCanvas;
 import org.kie.workbench.common.stunner.client.lienzo.canvas.LienzoPanel;
@@ -211,6 +212,8 @@ public class BPMNDiagramEditor {
 
                                           @Override
                                           public void onError(final ClientRuntimeError error) {
+                                              DomGlobal.console.debug("Error::" + error);
+
                                               stunnerEditor.handleError(error);
                                               failure.onInvoke(error);
                                           }

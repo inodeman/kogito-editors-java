@@ -22,6 +22,7 @@ import javax.validation.Valid;
 import javax.xml.bind.annotation.XmlRootElement;
 import javax.xml.bind.annotation.XmlTransient;
 
+import elemental2.dom.DomGlobal;
 import org.jboss.errai.common.client.api.annotations.MapsTo;
 import org.jboss.errai.common.client.api.annotations.Portable;
 import org.jboss.errai.databinding.client.api.Bindable;
@@ -64,6 +65,7 @@ public class StartNoneEvent extends StartEvent {
              "",
              new AdvancedData(),
              new BaseStartEventExecutionSet());
+        DomGlobal.console.debug("new StartNoneEvent");
     }
 
     public StartNoneEvent(final @MapsTo("name") String name,
@@ -74,6 +76,7 @@ public class StartNoneEvent extends StartEvent {
               documentation,
               advancedData);
         this.executionSet = executionSet;
+        DomGlobal.console.debug("new StartNoneEvent 2");
     }
 
     public BaseStartEventExecutionSet getExecutionSet() {
@@ -81,6 +84,8 @@ public class StartNoneEvent extends StartEvent {
     }
 
     public void setExecutionSet(BaseStartEventExecutionSet executionSet) {
+
+        DomGlobal.console.debug("StartNoneEvent:::setExecutionSet");
         this.executionSet = executionSet;
     }
 
@@ -92,6 +97,7 @@ public class StartNoneEvent extends StartEvent {
      */
     @Override
     public ExtensionElements getExtensionElements() {
+        DomGlobal.console.debug("StartNoneEvent:::getExtensionElements");
         ExtensionElements elements = super.getExtensionElements();
         if (StringUtils.nonEmpty(this.getExecutionSet().getSlaDueDate())) {
             MetaData sla = new MetaData("customSLADueDate", this.getExecutionSet().getSlaDueDate());

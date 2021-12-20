@@ -23,6 +23,7 @@ import java.util.Set;
 
 import javax.xml.bind.annotation.XmlTransient;
 
+import elemental2.dom.DomGlobal;
 import org.kie.soup.commons.util.Sets;
 import org.kie.workbench.common.stunner.bpmn.definition.BPMNCategories;
 import org.kie.workbench.common.stunner.bpmn.definition.BPMNViewDefinition;
@@ -74,12 +75,16 @@ public abstract class StartEvent extends FlowNode implements BPMNViewDefinition,
     private ElementParameters elementParameters = new ElementParameters();
 
     public StartEvent() {
+        DomGlobal.console.debug("new StartEvent:");
+
     }
 
     public StartEvent(final String name,
                       final String documentation,
                       final AdvancedData advancedData) {
         super(name, documentation, advancedData);
+        DomGlobal.console.debug("new StartEvent 2");
+
     }
 
     @Override
@@ -116,6 +121,8 @@ public abstract class StartEvent extends FlowNode implements BPMNViewDefinition,
      */
     @Override
     public void setId(String id) {
+        DomGlobal.console.debug("StartEvent:::setId");
+
         super.setId(id);
         getElementParameters().setElementRef(id);
     }
@@ -124,6 +131,8 @@ public abstract class StartEvent extends FlowNode implements BPMNViewDefinition,
     For compatibility reasons if simulation data is missing we need to generate default one.
      */
     public ElementParameters getElementParameters() {
+        DomGlobal.console.debug("StartEvent:::getElementParameters");
+
         if (elementParameters.getTimeParameters() == null) {
             elementParameters.setTimeParameters(
                     new TimeParameters(
@@ -137,6 +146,7 @@ public abstract class StartEvent extends FlowNode implements BPMNViewDefinition,
     }
 
     public void setElementParameters(ElementParameters elementParameters) {
+        DomGlobal.console.debug("StartEvent:::setElementParameters");
         this.elementParameters = elementParameters;
     }
 

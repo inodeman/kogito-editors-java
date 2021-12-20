@@ -132,6 +132,7 @@ public class BPMNClientMarshalling {
             }
 
             if (n instanceof StartEvent) {
+                DomGlobal.console.info("Start Event....");
                 StartEvent startEvent = (StartEvent) n;
                 process.getStartEvents().add(startEvent);
 
