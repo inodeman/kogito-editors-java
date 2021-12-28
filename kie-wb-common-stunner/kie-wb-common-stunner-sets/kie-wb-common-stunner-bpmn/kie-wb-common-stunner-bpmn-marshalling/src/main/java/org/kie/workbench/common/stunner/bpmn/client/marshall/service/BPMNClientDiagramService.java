@@ -17,7 +17,6 @@
 package org.kie.workbench.common.stunner.bpmn.client.marshall.service;
 
 import java.util.Collection;
-import java.util.Iterator;
 import java.util.Objects;
 
 import javax.enterprise.context.ApplicationScoped;
@@ -28,16 +27,19 @@ import elemental2.promise.Promise;
 import org.kie.workbench.common.stunner.bpmn.client.workitem.WorkItemDefinitionClientService;
 import org.kie.workbench.common.stunner.bpmn.definition.BPMNDiagram;
 import org.kie.workbench.common.stunner.bpmn.definition.BPMNViewDefinition;
+import org.kie.workbench.common.stunner.bpmn.definition.models.bpmn2.BaseTask;
 import org.kie.workbench.common.stunner.bpmn.definition.models.bpmn2.Definitions;
+import org.kie.workbench.common.stunner.bpmn.definition.models.bpmn2.EndEvent;
 import org.kie.workbench.common.stunner.bpmn.definition.models.bpmn2.Process;
+import org.kie.workbench.common.stunner.bpmn.definition.models.bpmn2.SequenceFlow;
 import org.kie.workbench.common.stunner.bpmn.definition.models.bpmn2.StartEvent;
-import org.kie.workbench.common.stunner.bpmn.definition.models.bpmn2.StartNoneEvent;
+import org.kie.workbench.common.stunner.bpmn.definition.models.bpmndi.BpmnEdge;
 import org.kie.workbench.common.stunner.bpmn.definition.models.bpmndi.BpmnShape;
+import org.kie.workbench.common.stunner.bpmn.definition.models.di.Waypoint;
 import org.kie.workbench.common.stunner.bpmn.factory.BPMNDiagramFactory;
 import org.kie.workbench.common.stunner.bpmn.workitem.WorkItemDefinition;
 import org.kie.workbench.common.stunner.core.api.DefinitionManager;
 import org.kie.workbench.common.stunner.core.api.FactoryManager;
-import org.kie.workbench.common.stunner.core.client.api.ClientFactoryManager;
 import org.kie.workbench.common.stunner.core.client.api.ShapeManager;
 import org.kie.workbench.common.stunner.core.client.service.ClientRuntimeError;
 import org.kie.workbench.common.stunner.core.client.service.ServiceCallback;
@@ -46,12 +48,14 @@ import org.kie.workbench.common.stunner.core.diagram.DiagramImpl;
 import org.kie.workbench.common.stunner.core.diagram.DiagramParsingException;
 import org.kie.workbench.common.stunner.core.diagram.Metadata;
 import org.kie.workbench.common.stunner.core.diagram.MetadataImpl;
+import org.kie.workbench.common.stunner.core.factory.impl.EdgeFactoryImpl;
 import org.kie.workbench.common.stunner.core.factory.impl.NodeFactoryImpl;
 import org.kie.workbench.common.stunner.core.graph.Edge;
-import org.kie.workbench.common.stunner.core.graph.Element;
 import org.kie.workbench.common.stunner.core.graph.Graph;
 import org.kie.workbench.common.stunner.core.graph.Node;
+import org.kie.workbench.common.stunner.core.graph.content.Bounds;
 import org.kie.workbench.common.stunner.core.graph.content.definition.Definition;
+import org.kie.workbench.common.stunner.core.graph.content.view.View;
 import org.kie.workbench.common.stunner.core.graph.content.view.ViewImpl;
 import org.kie.workbench.common.stunner.core.graph.impl.NodeImpl;
 import org.kie.workbench.common.stunner.core.graph.util.GraphUtils;
@@ -74,10 +78,11 @@ public class BPMNClientDiagramService extends AbstractKogitoClientDiagramService
     private final Promises promises;
     private final WorkItemDefinitionClientService widService;
     private final NodeFactoryImpl nodeFactory;
+    private final EdgeFactoryImpl edgeFactory;
 
     //CDI proxy
     protected BPMNClientDiagramService() {
-        this(null, null, null, null, null, null, null, null);
+        this(null, null, null, null, null, null, null, null, null);
     }
 
     @Inject
@@ -88,7 +93,8 @@ public class BPMNClientDiagramService extends AbstractKogitoClientDiagramService
                                     final ShapeManager shapeManager,
                                     final Promises promises,
                                     final WorkItemDefinitionClientService widService,
-                                    final NodeFactoryImpl nodeFactory) {
+                                    final NodeFactoryImpl nodeFactory,
+                                    final EdgeFactoryImpl edgeFactory) {
         this.definitionManager = definitionManager;
         this.marshalling = marshalling;
         this.factoryManager = factoryManager;
@@ -97,6 +103,7 @@ public class BPMNClientDiagramService extends AbstractKogitoClientDiagramService
         this.promises = promises;
         this.widService = widService;
         this.nodeFactory = nodeFactory;
+        this.edgeFactory = edgeFactory;
     }
 
     @Override
@@ -226,6 +233,7 @@ public class BPMNClientDiagramService extends AbstractKogitoClientDiagramService
         if (true) {
         //    return diagram;
         }
+
         for (StartEvent event : definitions.getProcess().getStartEvents()) {
             for (BpmnShape shape : definitions.getBpmnDiagram().getBpmnPlane().getBpmnShapes()) {
                 if (shape.getBpmnElement().equals(event.getId())) {
@@ -233,6 +241,7 @@ public class BPMNClientDiagramService extends AbstractKogitoClientDiagramService
                     DomGlobal.console.debug("BPMNClientDiagramService:::parse adding Node 1...");
                     final Node<Definition<Object>, Edge> build = nodeFactory.build(event.getId(), event, shape.getBounds().getX(), shape.getBounds().getY());
                     //EdgeFactoryImpl
+
                     DomGlobal.console.debug("BPMNClientDiagramService:::parse adding Node 2...");
                     //final ViewImpl<BPMNViewDefinition> content = node.getContent();
                     DomGlobal.console.debug("BPMNClientDiagramService:::parse adding Node 3...");
@@ -257,6 +266,135 @@ public class BPMNClientDiagramService extends AbstractKogitoClientDiagramService
                 }
             }
         }
+
+        for (EndEvent event : definitions.getProcess().getEndEvents()) {
+            for (BpmnShape shape : definitions.getBpmnDiagram().getBpmnPlane().getBpmnShapes()) {
+                if (shape.getBpmnElement().equals(event.getId())) {
+
+                    DomGlobal.console.debug("BPMNClientDiagramService:::parse adding Node 1...");
+                    final Node<Definition<Object>, Edge> build = nodeFactory.build(event.getId(), event, shape.getBounds().getX(), shape.getBounds().getY());
+                    //EdgeFactoryImpl
+                    DomGlobal.console.debug("BPMNClientDiagramService:::parse adding Node 2...");
+                    //final ViewImpl<BPMNViewDefinition> content = node.getContent();
+                    DomGlobal.console.debug("BPMNClientDiagramService:::parse adding Node 3...");
+                    DomGlobal.console.debug("Start Event id::" + event.getId());
+                    DomGlobal.console.debug("Start Event Categoru::" + event.getCategory());
+                    DomGlobal.console.debug("Start Event Name::" + event.getName());
+                    DomGlobal.console.debug("Start Event Documentation::" + event.getDocumentation());
+                    DomGlobal.console.debug("Start Event Element Parameters::" + event.getElementParameters());
+                    DomGlobal.console.debug("Start Event Labels::" + event.getLabels());
+                    DomGlobal.console.debug("Start Event Incoming::" + event.getIncoming());
+                    DomGlobal.console.debug("Start Event hasInputVars::" + event.hasInputVars());
+                    DomGlobal.console.debug("Start Event hasOutputvars::" + event.hasOutputVars());
+                    DomGlobal.console.debug("Start Event isSingleInputVar::" + event.isSingleInputVar());
+                    DomGlobal.console.debug("Start Event isSingleOutputVar::" + event.isSingleOutputVar());
+                    DomGlobal.console.debug("Start Event getAdvancedData::" + event.getAdvancedData());
+                    DomGlobal.console.debug("Start Event getExtensionElements::" + event.getExtensionElements());
+                    DomGlobal.console.debug("Start Event Content::" + build.getContent());
+                    DomGlobal.console.debug("BPMNClientDiagramService:::parse adding Node 4...");
+
+                    diagram.getGraph().addNode(build);
+
+                }
+            }
+        }
+
+
+
+
+        for (BaseTask event : definitions.getProcess().getTasks()) {
+            for (BpmnShape shape : definitions.getBpmnDiagram().getBpmnPlane().getBpmnShapes()) {
+                if (shape.getBpmnElement().equals(event.getId())) {
+
+                    DomGlobal.console.debug("BPMNClientDiagramService:::parse adding Node 1...");
+                    final Node<Definition<Object>, Edge> build = nodeFactory.build(event.getId(), event, shape.getBounds().getX(), shape.getBounds().getY());
+                    //EdgeFactoryImpl
+                    DomGlobal.console.debug("BPMNClientDiagramService:::parse adding Node 2...");
+                    //final ViewImpl<BPMNViewDefinition> content = node.getContent();
+                    DomGlobal.console.debug("BPMNClientDiagramService:::parse adding Node 3...");
+                    DomGlobal.console.debug("Start Event id::" + event.getId());
+                    DomGlobal.console.debug("Start Event Categoru::" + event.getCategory());
+                    DomGlobal.console.debug("Start Event Name::" + event.getName());
+                    DomGlobal.console.debug("Start Event Documentation::" + event.getDocumentation());
+                    DomGlobal.console.debug("Start Event Labels::" + event.getLabels());
+                    DomGlobal.console.debug("Start Event Incoming::" + event.getIncoming());
+                    DomGlobal.console.debug("Start Event Outgoing::" + event.getOutgoing());
+                    DomGlobal.console.debug("Start Event getAdvancedData::" + event.getAdvancedData());
+                    DomGlobal.console.debug("Start Event getExtensionElements::" + event.getExtensionElements());
+                    DomGlobal.console.debug("Start Event Content::" + build.getContent());
+                    DomGlobal.console.debug("BPMNClientDiagramService:::parse adding Node 4...");
+
+                    diagram.getGraph().addNode(build);
+
+                }
+            }
+        }
+
+        // Wagner this is where I build the Sequence Flows
+
+        for (SequenceFlow event : definitions.getProcess().getSequenceFlows()) {
+            for (BpmnEdge shape : definitions.getBpmnDiagram().getBpmnPlane().getBpmnEdges()) {
+                if (shape.getBpmnElement().equals(event.getId())) {
+
+                    DomGlobal.console.debug("BPMNClientDiagramService:::parse adding Node 1...");
+
+                    final String sourceRef = event.getSourceRef();
+                    final String targetRef = event.getTargetRef();
+
+                    View<Object> contentSource =  (View<Object>) diagram.getGraph().getNode(sourceRef).getContent();
+                    View<Object> contentTarget =  (View<Object>) diagram.getGraph().getNode(targetRef).getContent();
+
+                    double sourceX = contentSource.getBounds().getUpperLeft().getX() + shape.getWaypoint().get(0).getX();
+                    double sourceY = contentSource.getBounds().getUpperLeft().getY() + shape.getWaypoint().get(0).getY();
+
+                    double targetX = 150;//contentTarget.getBounds().getUpperLeft().getX() + shape.getWaypoint().get(1).getX();
+                    double targetY = 300;//contentTarget.getBounds().getUpperLeft().getY() + shape.getWaypoint().get(1).getY();
+
+                    DomGlobal.console.debug("Source X: " + sourceX);
+                    DomGlobal.console.debug("Source Y: " + sourceY);
+
+                    DomGlobal.console.debug("Target X: " + targetX);
+                    DomGlobal.console.debug("Target Y: " + targetY);
+
+                    Bounds bounds = Bounds.create(sourceX, sourceY, targetX, targetY);
+                    final Edge<Definition<Object>, Node> build = edgeFactory.build(event.getId(), event, bounds);
+
+                    DomGlobal.console.debug("Source Ref content Bounds:" + contentSource.getBounds().getUpperLeft());
+                    DomGlobal.console.debug("Target Ref content Bounds:" + contentTarget.getBounds().getUpperLeft());
+
+                    DomGlobal.console.debug("BPMNClientDiagramService:::parse adding Sequence Flow ..." + shape.getWaypoint());
+
+                    for (Waypoint point: shape.getWaypoint()) {
+                        DomGlobal.console.debug("BPMNClientDiagramService:::parse adding Sequence Flow point: " + point.getX() + " - " + point.getY());
+                    }
+
+                    //EdgeFactoryImpl
+
+                    DomGlobal.console.debug("BPMNClientDiagramService:::parse adding Node 2...");
+                    //final ViewImpl<BPMNViewDefinition> content = node.getContent();
+                    DomGlobal.console.debug("BPMNClientDiagramService:::parse adding Node 3...");
+                    DomGlobal.console.debug("Start Event id::" + event.getId());
+                    DomGlobal.console.debug("Start Event Categoru::" + event.getCategory());
+                    DomGlobal.console.debug("Start Event Name::" + event.getName());
+                    DomGlobal.console.debug("Start Event Documentation::" + event.getDocumentation());
+                    DomGlobal.console.debug("Start Event Labels::" + event.getLabels());
+                    DomGlobal.console.debug("Start Event getExtensionElements::" + event.getExtensionElements());
+                    DomGlobal.console.debug("Start Event Content::" + build.getContent());
+                    DomGlobal.console.debug("BPMNClientDiagramService:::parse adding Node 4...");
+                    diagram.getGraph().getNode(sourceRef).getOutEdges().add(build);
+                    diagram.getGraph().getNode(targetRef).getInEdges().add(build);
+
+
+                }
+            }
+        }
+
+
+
+
+
+
+
         DomGlobal.console.debug("BPMNClientDiagramService:::parse update Diagram...");
 
         updateDiagramSet(diagramNode, fileName);

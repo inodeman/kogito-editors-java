@@ -19,6 +19,7 @@ package org.kie.workbench.common.stunner.core.factory.impl;
 import javax.enterprise.context.ApplicationScoped;
 import javax.inject.Inject;
 
+import elemental2.dom.DomGlobal;
 import org.kie.workbench.common.stunner.core.api.DefinitionManager;
 import org.kie.workbench.common.stunner.core.factory.graph.EdgeFactory;
 import org.kie.workbench.common.stunner.core.factory.graph.ElementFactory;
@@ -65,6 +66,20 @@ public class EdgeFactoryImpl extends AbstractElementFactory<Object, Definition<O
         return edge;
     }
 
+    @SuppressWarnings("unchecked")
+    public Edge<Definition<Object>, Node> build(final String uuid,
+                                                final Object definition, Bounds bounds) {
+        final EdgeImpl edge = new EdgeImpl<>(uuid);
+        if (null != definition) {
+            ViewConnector<Object> content = new ViewConnectorImpl<>(definition,
+                                                                    bounds);
+            edge.setContent(content);
+            appendLabels(edge.getLabels(),
+                         definition);
+        }
+        return edge;
+    }
+
     @Override
     public boolean accepts(final Object source) {
         return true;
@@ -77,6 +92,7 @@ public class EdgeFactoryImpl extends AbstractElementFactory<Object, Definition<O
 
     // TODO: Review.
     private Bounds buildBounds() {
+        DomGlobal.console.debug("Building Bounds...");
         return Bounds.create(0d, 0d, 30d, 30d);
     }
 }
