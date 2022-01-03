@@ -55,7 +55,10 @@ import org.kie.workbench.common.stunner.core.graph.Graph;
 import org.kie.workbench.common.stunner.core.graph.Node;
 import org.kie.workbench.common.stunner.core.graph.content.Bounds;
 import org.kie.workbench.common.stunner.core.graph.content.definition.Definition;
+import org.kie.workbench.common.stunner.core.graph.content.view.MagnetConnection;
+import org.kie.workbench.common.stunner.core.graph.content.view.Point2D;
 import org.kie.workbench.common.stunner.core.graph.content.view.View;
+import org.kie.workbench.common.stunner.core.graph.content.view.ViewConnector;
 import org.kie.workbench.common.stunner.core.graph.content.view.ViewImpl;
 import org.kie.workbench.common.stunner.core.graph.impl.NodeImpl;
 import org.kie.workbench.common.stunner.core.graph.util.GraphUtils;
@@ -344,11 +347,11 @@ public class BPMNClientDiagramService extends AbstractKogitoClientDiagramService
                     View<Object> contentSource =  (View<Object>) diagram.getGraph().getNode(sourceRef).getContent();
                     View<Object> contentTarget =  (View<Object>) diagram.getGraph().getNode(targetRef).getContent();
 
-                    double sourceX = contentSource.getBounds().getUpperLeft().getX() + shape.getWaypoint().get(0).getX();
-                    double sourceY = contentSource.getBounds().getUpperLeft().getY() + shape.getWaypoint().get(0).getY();
+                    double sourceX = contentSource.getBounds().getUpperLeft().getX();// + (shape.getWaypoint().get(0).getX() / 2);
+                    double sourceY = contentSource.getBounds().getUpperLeft().getY();// + (shape.getWaypoint().get(0).getY() / 2);
 
-                    double targetX = 150;//contentTarget.getBounds().getUpperLeft().getX() + shape.getWaypoint().get(1).getX();
-                    double targetY = 300;//contentTarget.getBounds().getUpperLeft().getY() + shape.getWaypoint().get(1).getY();
+                    double targetX = contentTarget.getBounds().getUpperLeft().getX();// + (shape.getWaypoint().get(1).getX() / 2);
+                    double targetY = contentTarget.getBounds().getUpperLeft().getY();// + (shape.getWaypoint().get(1).getY() / 2);
 
                     DomGlobal.console.debug("Source X: " + sourceX);
                     DomGlobal.console.debug("Source Y: " + sourceY);
@@ -357,7 +360,7 @@ public class BPMNClientDiagramService extends AbstractKogitoClientDiagramService
                     DomGlobal.console.debug("Target Y: " + targetY);
 
                     Bounds bounds = Bounds.create(sourceX, sourceY, targetX, targetY);
-                    final Edge<Definition<Object>, Node> build = edgeFactory.build(event.getId(), event, bounds);
+                    final Edge<Definition<Object>, Node> build = edgeFactory.build(event.getId(), event);
 
                     DomGlobal.console.debug("Source Ref content Bounds:" + contentSource.getBounds().getUpperLeft());
                     DomGlobal.console.debug("Target Ref content Bounds:" + contentTarget.getBounds().getUpperLeft());
@@ -381,6 +384,28 @@ public class BPMNClientDiagramService extends AbstractKogitoClientDiagramService
                     DomGlobal.console.debug("Start Event getExtensionElements::" + event.getExtensionElements());
                     DomGlobal.console.debug("Start Event Content::" + build.getContent());
                     DomGlobal.console.debug("BPMNClientDiagramService:::parse adding Node 4...");
+
+                    build.setSourceNode(diagram.getGraph().getNode(sourceRef));
+                    build.setTargetNode(diagram.getGraph().getNode(targetRef));
+
+                    //Here I create the magnet connections.
+                    //MagnetConnection sourceConnection = MagnetConnection.Builder.at(sourceX, sourceY);
+                    //MagnetConnection targetConnection = MagnetConnection.Builder.at(targetX, targetY);
+
+                    MagnetConnection sourceConnection = MagnetConnection.Builder.atCenter(diagram.getGraph().getNode(sourceRef));
+                    MagnetConnection targetConnection = MagnetConnection.Builder.atCenter(diagram.getGraph().getNode(targetRef));
+                    sourceConnection.setLocation(new Point2D(sourceX, sourceY));
+                    targetConnection.setLocation(new Point2D(targetX, targetY));
+
+
+                    //MagnetConnection targetConnection = MagnetConnection.Builder.forTarget(diagram.getGraph().getNode(sourceRef), diagram.getGraph().getNode(targetRef));
+
+
+                    //Here I set the connections on the connector.
+                    ViewConnector<Object> connector = (ViewConnector<Object>) build.getContent();
+                    connector.setSourceConnection(sourceConnection);
+                    connector.setTargetConnection(targetConnection);
+
                     diagram.getGraph().getNode(sourceRef).getOutEdges().add(build);
                     diagram.getGraph().getNode(targetRef).getInEdges().add(build);
 
